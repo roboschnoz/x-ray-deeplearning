@@ -5,8 +5,14 @@ import matplotlib.pyplot as plt
 import shutil
 import numpy as np
 from pathlib import Path
-import torch
-from torchvision import transforms
+from torch import nn, Tensor, squeeze
+from torch.utils.data import DataLoader, RandomSampler, Subset
+from torchvision import transforms, datasets
+import torchvision
+from os import listdir
+from matplotlib import image
+
+print(os.getcwd())
 
 # # im = Image.open(r'G:\17810_23812_bundle_archive\chest_xray\chest_xray\test\NORMAL\IM-0001-0001.jpeg')
 # # print(im.format, im.size, im.mode)
@@ -108,22 +114,111 @@ from torchvision import transforms
 
 ############################################# DATA LOAD ##############################################################
 
-train_normal_rearranged = os.listdir(r'G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\train\NORMAL')
+train_normal_rearranged = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\train\NORMAL")
+train_pneumonia_rearranged = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\train\PNEUMONIA")
+val_normal_rearranged = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\val\NORMAL")
+val_pneumonia_rearranged = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\val\PNEUMONIA")
+test_normal_rearranged = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\test\NORMAL")
+test_pneumonia_rearranged = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\test\PNEUMONIA")
+BASE_PATH = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray")
 
-BASE_PATH = r"G:\17810_23812_bundle_archive\chest_xray\chest_xray"
+train_path = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\train")
+val_path = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\val")
+test_path = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearranged\test")
+# train_normal_rearranged  = os.path.join(train_normal_rearranged, '')
+# print(train_normal_rearranged)
+# train_normal_rearranged = train_normal_rearranged + os.path.sep
+
+# train_normal_labels = torch.ones(len(os.listdir(train_normal_rearranged)))
+# train_pneumonia_labels = torch.zeros(len(os.listdir(train_pneumonia_rearranged)))
+
+# img = Image.open(BASE_PATH + r"\rearranged\train\NORMAL\IM-0001-0001.jpeg")
+# print(img.getbands())
+# mask = np.array(img)
+# shape = mask.shape
+# # print(mask)
+# # print(shape)
+# trans = transforms.ToTensor()
+# test = trans(img)
+# print(test)
+
+# train_normal_images = list()
+# for filename in listdir(train_normal_rearranged):
+# 	# load image
+# 	img_data = image.imread(train_normal_rearranged + os.path.sep + filename)
+# # 	# store loaded image
+# 	train_normal_images.append(img_data)
+# 	print('> loaded %s %s' % (filename, img_data.shape))
+#
+transform = transforms.Compose([transforms.Resize(255),
+                                transforms.CenterCrop(224),
+                                transforms.Grayscale(num_output_channels=1),
+                                transforms.ToTensor()])
+
+dataset_train = datasets.ImageFolder(train_path, transform=transform)
+dataset_val = datasets.ImageFolder(val_path, transform=transform)
+dataset_test = datasets.ImageFolder(test_path, transform=transform)
 
 
-print(train_normal_rearranged)
-
-img = Image.open(BASE_PATH + r"\rearranged\train\NORMAL\IM-0001-0001.jpeg")
-print(img.getbands())
-mask = np.array(img)
-shape = mask.shape
-# print(mask)
-# print(shape)
-trans = transforms.ToTensor()
+train_loader = DataLoader(dataset_train, shuffle=True, batch_size=4)
 
 
+dataiter = iter(train_loader)
+images, labels = dataiter.next()
+#
+#
+# images_test = images[0].permute(1,2,0)
+# images_test = squeeze(images_test, dim=2)
+# print(images_test.shape)
+# print(images_test, labels[0])
+# plt.imshow(images_test, cmap='gray')
+# plt.show()
+
+
+images_grid = torchvision.utils.make_grid(images)
+images_permute = images_grid.permute(1,2,0)
+print(images.shape)
+print(images_permute.shape)
+print(labels)
+plt.imshow(torchvision.utils.make_grid(images_permute), cmap='gray')
+plt.show()
+
+
+
+# class ConvNet(nn.Module):
+#     def __init__(self):
+#         self.conv1 = nn.Conv2d(1, 6)
+#         self.pool = nn.MaxPool2d(2, 2)
+#         self.conv2 = nn.Conv2d(1, 254, 254)
+#
+#     def forward(self, x):
+#         pass
+
+# # Make a grid from batch
+# out = torchvision.utils.make_grid(inputs)
+#
+# imshow(out, title=[class_names[x] for x in classes])
+
+
+# inputs, classes = next(iter(loader['NORMAL']))
+# out = torchvision.utils.make_grid(inputs)
+# imshow(out, title=[class_names[x] for x in classes])
+
+# dataset_pneumonia_train = datasets.ImageFolder(train_pneumonia_rearranged, transform=transform)
+# dataset_normal_val = datasets.ImageFolder(val_normal_rearranged, transform=transform)
+# dataset_pneumonia_val = datasets.ImageFolder(val_pneumonia_rearranged, transform=transform)
+# dataset_normal_test = datasets.ImageFolder(test_normal_rearranged, transform=transform)
+# dataset_pneumonia_test = datasets.ImageFolder(test_pneumonia_rearranged, transform=transform)
+
+
+# for images, labels in dataset_train.take(1):  # only take first element of dataset
+#     numpy_images = images.numpy()
+#     numpy_labels = labels.numpy()
+#
+# print(numpy_images, numpy_labels)
+# dataloader = torch.utils.data.DataLoader(dataset_normal_train, batch_size=32, shuffle=True)
+# images, labels = next(iter(dataloader))
+# plt.imshow()
 # df = pd.DataFrame(im3_t[4:15,4:22])
 # df.style.set_properties(**{'font-size':'6pt'}).background_gradient('Greys')
 # img.show()
