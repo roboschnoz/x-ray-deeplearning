@@ -16,9 +16,7 @@ from matplotlib import image
 
 print(os.getcwd())
 
-print(torch.cuda.is_available())
-
-device = torch.device('cuda')
+device = torch.device('cpu')
 # # im = Image.open(r'G:\17810_23812_bundle_archive\chest_xray\chest_xray\test\NORMAL\IM-0001-0001.jpeg')
 # # print(im.format, im.size, im.mode)
 # # im.show();
@@ -186,7 +184,7 @@ images, labels = dataiter.next()
 # plt.imshow(images_test, cmap='gray')
 # plt.show()
 
-####################################### SHOW BATCH
+###################################### SHOW BATCH
 # images_grid = torchvision.utils.make_grid(images)
 # images_permute = images_grid.permute(1,2,0)
 # print(images.shape)
@@ -195,6 +193,19 @@ images, labels = dataiter.next()
 # plt.imshow(torchvision.utils.make_grid(images_permute), cmap='gray')
 # plt.show()
 
+##### BLOCK START
+# def run():
+#     torch.multiprocessing.freeze_support()
+#     print('loop')
+#
+# if __name__ == '__main__':
+#     run()
+#
+# train_set = datasets.ImageFolder(train_path, transform=transforms)
+# train_loader_full = DataLoader(dataset_train, batch_size=len(train_set), num_workers=1)
+# data = next(iter(train_loader_full))
+#
+# print(data[0].mean(), data[0].std())
 
 
 class ConvNet(nn.Module):
@@ -251,7 +262,7 @@ for epoch in range(num_epochs):
 
         # Forward pass
         outputs = model(images)
-        loss = criterion(outputs, labels)
+        loss = criterion(outputs.view(4).float(), labels.float())
 
         # Backward and optimize
         optimizer.zero_grad()
@@ -263,7 +274,7 @@ for epoch in range(num_epochs):
 
 print('Finished Training')
 PATH = 'G:/x-ray_deeplearning/model'
-torch.save(model.state_dict(), PATH)
+# torch.save(model.state_dict(), PATH)
 
 with torch.no_grad():
     n_correct = 0
@@ -292,6 +303,11 @@ with torch.no_grad():
     for i in range(10):
         acc = 100.0 * n_class_correct[i] / n_class_samples[i]
         print(f'Accuracy of {classes[i]}: {acc} %')
+
+##### BLOCK END
+
+
+
 # # Make a grid from batch
 # out = torchvision.utils.make_grid(inputs)
 #
