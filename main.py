@@ -13,10 +13,10 @@ import torchvision
 import torch
 from os import listdir
 from matplotlib import image
+import time
 
 print(os.getcwd())
 
-device = torch.device('cpu')
 # # im = Image.open(r'G:\17810_23812_bundle_archive\chest_xray\chest_xray\test\NORMAL\IM-0001-0001.jpeg')
 # # print(im.format, im.size, im.mode)
 # # im.show();
@@ -152,62 +152,80 @@ test_path = Path(r"G:\17810_23812_bundle_archive\chest_xray\chest_xray\rearrange
 # # 	# store loaded image
 # 	train_normal_images.append(img_data)
 # 	print('> loaded %s %s' % (filename, img_data.shape))
-#
-classes = ('normal', 'pneumonia')
+
+device = torch.device('cuda')
+
+classes = ('NORMAL', 'PNEUMONIA')
 num_epochs = 4
 batch_size = 4
 
-
 transform = transforms.Compose([transforms.Resize(268),
                                 transforms.CenterCrop(268),
+                                transforms.RandomAffine(45),
                                 transforms.Grayscale(num_output_channels=1),
-                                transforms.ToTensor()])
+                                transforms.ToTensor(),
+                                # hardcoded normalization values
+                                transforms.Normalize(mean = [0.5165],
+                                                     std = [0.2483])
+                                ])
 
 dataset_train = datasets.ImageFolder(train_path, transform=transform)
 dataset_val = datasets.ImageFolder(val_path, transform=transform)
 dataset_test = datasets.ImageFolder(test_path, transform=transform)
 
+# img_normalize = torch.stack([img_t for img_t, _ in dataset_train], dim=3)
+# img_mean = img_normalize.view(1,-1).mean(1)
+# img_std = img_normalize.view(1,-1).std(1)
+# print(f'normalized tensor shape: {img_normalize.shape}, mean value:{img_mean}, std value:{img_std}')
 
-train_loader = DataLoader(dataset_train, shuffle=True, batch_size=batch_size)
-val_loader = DataLoader(dataset_val, shuffle=True, batch_size=batch_size)
-test_loader = DataLoader(dataset_test, shuffle=True, batch_size=batch_size)
+
+train_loader = DataLoader(dataset_train,drop_last=True, shuffle=True, batch_size=batch_size)
+val_loader = DataLoader(dataset_val,drop_last=True, shuffle=False, batch_size=batch_size)
+test_loader = DataLoader(dataset_test,drop_last=True, shuffle=False, batch_size=batch_size)
+
+
+
 
 
 dataiter = iter(train_loader)
 images, labels = dataiter.next()
-#
-#
-# images_test = images[0].permute(1,2,0)
-# images_test = squeeze(images_test, dim=2)
-# print(images_test.shape)
-# print(images_test, labels[0])
-# plt.imshow(images_test, cmap='gray')
-# plt.show()
+print(f'images.shape: {images.shape}')
+
+
+
+images_test = images[0].permute(1,2,0)
+images_test = squeeze(images_test, dim=2)
+print(images_test.shape)
+print(images_test, labels[0])
+plt.imshow(images_test, cmap='gray')
+plt.show()
 
 ###################################### SHOW BATCH
-# images_grid = torchvision.utils.make_grid(images)
-# images_permute = images_grid.permute(1,2,0)
-# print(images.shape)
-# print(images_permute.shape)
-# print(labels)
-# plt.imshow(torchvision.utils.make_grid(images_permute), cmap='gray')
-# plt.show()
+images_grid = torchvision.utils.make_grid(images)
+images_permute = images_grid.permute(1,2,0)
+print(images.shape)
+print(images_permute.shape)
+print(labels)
+plt.imshow(torchvision.utils.make_grid(images_permute), cmap='gray')
+plt.show()
 
-##### BLOCK START
-# def run():
-#     torch.multiprocessing.freeze_support()
-#     print('loop')
-#
-# if __name__ == '__main__':
-#     run()
-#
+
+############## GET MEAN/STD
+
 # train_set = datasets.ImageFolder(train_path, transform=transforms)
 # train_loader_full = DataLoader(dataset_train, batch_size=len(train_set), num_workers=1)
-# data = next(iter(train_loader_full))
 #
-# print(data[0].mean(), data[0].std())
+# def main():
+#     data = next(iter(train_loader_full))
+#     print(data[0].max())
+#     print(data[0].min())
+#     pass
+#
+# if __name__ == '__main__':
+#     main()
 
 
+#### BLOCK START
 class ConvNet(nn.Module):
     def __init__(self):
         super(ConvNet, self).__init__()
@@ -238,60 +256,81 @@ class ConvNet(nn.Module):
 
 model = ConvNet().to(device)
 
-criterion = nn.BCELoss()
+# criterion = nn.CrossEntropyLoss()
+criterion = nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr = 0.0001)
 
-
+print(len(train_loader))
+print(f'images.shape before training loop: {images.shape}')
 # training loop
 n_total_steps = len(train_loader)
 for epoch in range(num_epochs):
     for i, (images,labels) in enumerate(train_loader):
         images = images.to(device)
         labels = labels.to(device)
-
-#forward pass
-outputs = model(images)
-
-n_total_steps = len(train_loader)
-for epoch in range(num_epochs):
-    for i, (images, labels) in enumerate(train_loader):
-        # origin shape: [4, 3, 32, 32] = 4, 3, 1024
-        # input_layer: 3 input channels, 6 output channels, 5 kernel size
-        images = images.to(device)
-        labels = labels.to(device)
-
-        # Forward pass
         outputs = model(images)
-        loss = criterion(outputs.view(4).float(), labels.float())
+        loss = criterion(outputs.view(-1), labels.type_as(outputs))
 
-        # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        if (i + 1) % 2000 == 0:
+        if (i + 1) % 4 == 0:
             print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{n_total_steps}], Loss: {loss.item():.4f}')
 
 print('Finished Training')
 PATH = 'G:/x-ray_deeplearning/model'
 # torch.save(model.state_dict(), PATH)
 
+print(f'images.shape after training loop: {images.shape}')
+##########################################################forward pass
+# outputs = model(images)
+# test_array = np.array([])
+# n_total_steps = len(train_loader)
+# for epoch in range(num_epochs):
+#     for i, (images, labels) in enumerate(train_loader):
+#         # origin shape: [4, 3, 32, 32] = 4, 3, 1024
+#         # input_layer: 3 input channels, 6 output channels, 5 kernel size
+#
+#         images = images.to(device)
+#         labels = labels.to(device)
+###########################################################
+# for i, x in enumerate(images):
+#     print(images.shape)
+
+# Forward pass
+# print(f'images.shape after forward pass: {images.shape}')
+# print(outputs.shape, labels.shape)
+# time.sleep(20)
+# print(images.shape, labels.shape)
+# print(outputs.shape, labels.shape)
+# print(outputs.view(2).shape, labels.shape)
+
+
+# Backward and optimize
+
+
+
+
 with torch.no_grad():
     n_correct = 0
     n_samples = 0
-    n_class_correct = [0 for i in range(10)]
-    n_class_samples = [0 for i in range(10)]
-    for images, labels in test_loader:
-        images = images.to(device)
-        labels = labels.to(device)
-        outputs = model(images)
+    test_iter = 0
+    n_class_correct = [0 for i in range(2)]
+    n_class_samples = [0 for i in range(2)]
+    for images_test, labels_test in test_loader:
+        images_test = images_test.to(device)
+        labels_test = labels_test.to(device)
+        outputs = model(images_test)
+        print(outputs)
         # max returns (value ,index)
         _, predicted = torch.max(outputs, 1)
-        n_samples += labels.size(0)
-        n_correct += (predicted == labels).sum().item()
+        n_samples += labels_test.size(0)
+        print(labels_test.size(0))
+        n_correct += (predicted == labels_test).sum().item()
 
         for i in range(batch_size):
-            label = labels[i]
+            label = labels_test[i]
             pred = predicted[i]
             if (label == pred):
                 n_class_correct[label] += 1
@@ -300,7 +339,7 @@ with torch.no_grad():
     acc = 100.0 * n_correct / n_samples
     print(f'Accuracy of the network: {acc} %')
 
-    for i in range(10):
+    for i in range(2):
         acc = 100.0 * n_class_correct[i] / n_class_samples[i]
         print(f'Accuracy of {classes[i]}: {acc} %')
 
